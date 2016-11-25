@@ -7,7 +7,7 @@ var crate = require('../')
 // it = Lab.test,
 // expect = Lab.expect
 var docsToInsert = 1000
-crate.connect('http://127.0.0.1:4200')
+crate.connect('http://127.0.0.1:8200')
 
 describe('#node-crate', function () {
   it('Create blob table', function (done) {
@@ -25,7 +25,9 @@ describe('#node-crate', function () {
   })
 
   it('Create table', function (done) {
-    var schema = {NodeCrateTest: {id: 'integer primary key', title: 'string'}}
+    var schema = {NodeCrateTest: {id: 'integer primary key', title: 'string',
+                                  farray: 'array(string)',
+                                  sub_object: 'object as (title string, sub_array array(string), sub_obj_array array(object as (soa_title string)))'}}
     crate.create(schema)
       .success(function (res) {
         expect(res.rowcount).toBe(1)
@@ -177,6 +179,82 @@ describe('#node-crate', function () {
         })
     }, 4000)
   })
+
+  it('Update with nested Object', function (done) {
+    setTimeout(function () {
+      crate.update('NodeCrateTest', {
+        title: 'TitleNewWithSub',
+        farray: [ 'f1', 'f2'],
+        sub_object: { title: 'SubTitle',
+                     sub_array: [ 'sub1', 'sub2', 'sub3']
+                   }
+      }, 'id=1')
+        .success(function (res) {
+          expect(res.rowcount).toBe(1)
+          done()
+        })
+        .error(function (err) {
+          done(err)
+        })
+    }, 2000)
+  })
+
+  it('Select after nested update', function (done) {
+    setTimeout(function () {
+      crate.execute('SELECT * FROM NodeCrateTest where id=1 limit 100')
+        .success(function (res) {
+          expect(res.json[0].title).toBe('TitleNewWithSub')
+          expect(res.json[0].farray.length).toBe(2)
+          expect(res.json[0].sub_object.title).toBe('SubTitle')
+          expect(res.json[0].sub_object.sub_array.length).toBe(3)
+          expect(res.json[0].numberVal).toBe(42)
+          done()
+        })
+        .error(function (err) {
+          console.log(err)
+          done(err)
+        })
+    }, 4000)
+  })
+
+  it('Update with nested array with Object', function (done) {
+    setTimeout(function () {
+      crate.update('NodeCrateTest', {
+        title: 'TitleNewWithSubArrayObject',
+        farray: [ 'f1', 'f2'],
+        sub_object: { title: 'SubTitle',
+                      sub_array: [ 'sub1', 'sub2', 'sub3'],
+                      sub_obj_array: [ { soa_title: 'SoaTitle' }]
+                   }
+      }, 'id=1')
+        .success(function (res) {
+          expect(res.rowcount).toBe(1)
+          done()
+        })
+        .error(function (err) {
+          done(err)
+        })
+    }, 2000)
+  })
+
+  it('Select after nested update', function (done) {
+    setTimeout(function () {
+      crate.execute('SELECT * FROM NodeCrateTest where id=1 limit 100')
+        .success(function (res) {
+          expect(res.json[0].title).toBe('TitleNewWithSubArrayObject')
+          expect(res.json[0].farray.length).toBe(2)
+          expect(res.json[0].sub_object.title).toBe('SubTitle')
+          expect(res.json[0].sub_object.sub_obj_array[0].soa_title).toBe('SoaTitle')
+          expect(res.json[0].numberVal).toBe(42)
+          done()
+        })
+        .error(function (err) {
+          console.log(err)
+          done(err)
+        })
+    }, 4000)
+  })
+
 
   it('getBlob', function (done) {
     crate.getBlob('blobtest', hashkey)
